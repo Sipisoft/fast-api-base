@@ -28,9 +28,9 @@ class Admin(Base):
     role_id = Column(pgUUId(as_uuid=True), ForeignKey('roles.id'), index=True, nullable=True)
     role = relationship("Role", back_populates="admins")
 
-
     password_reset_token = Column(String, unique=True, index=True, nullable=True)
     password_reset_token_expires_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, server_default=func.now(), nullable=True)
     updated_at = Column(DateTime, server_default=func.now(), nullable=True)
     active = Column(Boolean, default=True)
@@ -73,15 +73,6 @@ class AdminResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
-
-class EmailOtpRequest(BaseModel):
-    email: EmailStr = Field(..., title="Email", description="Email of the User")
-
-
-class EmailOtpVerifyRequest(BaseModel):
-    email: EmailStr = Field(..., title="Email", description="Email of the User")
-    otp: str = Field(..., min_length=4, max_length=12, title="OTP", description="One-time password sent to the user")
-
 
 async def create(db: Session, admin: AdminRequest, current_admin: Admin , request: Request = None) -> Admin:
     from src.mailers.password_reset_mailer import PasswordResetMailer
@@ -190,8 +181,18 @@ def set_new_password(db: Session, password_reset_request: AdminPasswordResetRequ
     db.refresh(admin)
     return admin
 
+class EmailOtpRequest(BaseModel):
+    email: EmailStr = Field(..., title= "Email", description= "Email of the User")
+
+class EmailOtpVerifyRequest(BaseModel):
+    email: EmailStr = Field(..., title="Email", description="Email of the User")
+    otp: str = Field(..., min_length=4, max_length=12, title="OTP", description="One-time password sent to the user")
+
+
 def get_admin_by_email(db: Session, email: EmailStr) -> Admin:
      admin = db.query(Admin).filter(Admin.email == email).first()
      if admin is None:
          raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin not found")
      return admin
+
+

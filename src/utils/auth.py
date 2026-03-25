@@ -1,22 +1,36 @@
-from datetime import datetime, timedelta, timezone
 import base64
-from functools import partial
+import os
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-from src.models.admin import Admin, AdminType
-from src.models.api_key import ApiKey
-from src.db.database import get_db
-from fastapi.security import OAuth2PasswordBearer
+
 from fastapi import Depends, HTTPException, status, Header
-from src.models.api_client_token import ApiClientToken
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt
+from pydantic import EmailStr
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound
-from jose import jwt
+
+from src.db.database import get_db
+from src.mailers.otp_mailer import OTPMailer
+from src.models.admin import Admin, get_admin_by_email
+from src.models.api_client_token import ApiClientToken
+from src.models.api_key import ApiKey
+from src.models.otp_code import OtpCode, OtpPurpose
 from src.utils.hash import Hash
 
 oauth2_schema = OAuth2PasswordBearer(tokenUrl="token")
 SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# OTP configuration (can be overridden via environment variables)
+OTP_EXPIRY_MINUTES = int(os.getenv("OTP_EXPIRY_MINUTES", "5"))
+OTP_MAX_ATTEMPTS = int(os.getenv("OTP_MAX_ATTEMPTS", "5"))
+OTP_LOCKOUT_MINUTES = int(os.getenv("OTP_LOCKOUT_MINUTES", "10"))
+OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv("OTP_RESEND_COOLDOWN_SECONDS", "60"))
+
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta: 
@@ -38,20 +52,20 @@ def get_user(token: str = Depends(oauth2_schema), db: Session = Depends(get_db))
         )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        
-        username = payload.get("sub") 
-        
+
+        username = payload.get("sub")
+
 
         if not username:
-            
+
             raise credentials_exception
-    
+
         model_name = Admin
-        
+
         if not model_name:
             raise credentials_exception
         user = db.query(model_name).filter(model_name.username == username).first()
-        
+
         if not user or user is None:
             raise credentials_exception
         return user
@@ -93,7 +107,7 @@ def get_current_api_key(authorization: str = Header(...) , db: Session = Depends
     except Exception as e:
         print(f"Error: {e}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key.")
-    
+
 
 
 def encode_basic_auth(username: str, password: str) -> str: 
@@ -101,3 +115,99 @@ def encode_basic_auth(username: str, password: str) -> str:
     encoded_bytes = base64.b64encode(crecentials.encode("utf-8"))
     encoded_str = encoded_bytes.decode("utf-8")
     return f"Basic {encoded_str}"
+
+def generate_otp()->str:
+    return "".join(str(secrets.randbelow(10)) for _ in range(6))
+
+
+async def send_otp_email(email:EmailStr,db: Session):
+
+    try:
+        admin = get_admin_by_email(db,email=email)
+        now = datetime.utcnow()
+
+        recent_active = (
+            db.query(OtpCode)
+            .filter(
+                OtpCode.admin_id == admin.id,
+                OtpCode.purpose == OtpPurpose.LOGIN,
+                OtpCode.active == True,  # noqa: E712
+                OtpCode.created_at > now - timedelta(seconds=OTP_RESEND_COOLDOWN_SECONDS),
+            )
+            .order_by(OtpCode.created_at.desc())
+            .first()
+        )
+        if recent_active is not None:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="OTP was recently sent. Please wait before requesting a new code."
+            )
+
+        otp = generate_otp()
+        otp_code = OtpCode(
+            admin_id=admin.id,
+            code_hash=Hash.encrypt(otp),
+            purpose=OtpPurpose.LOGIN,
+            expires_at=now + timedelta(minutes=OTP_EXPIRY_MINUTES),
+            max_attempts=OTP_MAX_ATTEMPTS,
+        )
+        db.add(otp_code)
+        db.commit()
+        db.refresh(otp_code)
+
+        await OTPMailer(admin, otp).send()
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send OTP. Please try again later."
+        )
+
+
+async def verify_email_otp(email: EmailStr, otp: str, db: Session) -> Admin:
+
+    admin = get_admin_by_email(db, email=email)
+    now = datetime.utcnow()
+
+    otp_code = (
+        db.query(OtpCode)
+        .filter(
+            OtpCode.admin_id == admin.id,
+            OtpCode.purpose == OtpPurpose.LOGIN,
+            OtpCode.active == True,  # noqa: E712
+        )
+        .order_by(OtpCode.created_at.desc())
+        .first()
+    )
+
+    if otp_code is None or otp_code.is_expired(now):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OTP is invalid or has expired. Please request a new code."
+        )
+
+    if otp_code.is_locked(now):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many invalid attempts. Please try again later."
+        )
+
+    # Verify OTP
+    if not Hash.verify(otp, otp_code.code_hash):
+        otp_code.register_failed_attempt(now, OTP_LOCKOUT_MINUTES)
+        db.add(otp_code)
+        db.commit()
+        db.refresh(otp_code)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid OTP."
+        )
+
+    # Successful verification: mark OTP as used and inactive
+    otp_code.mark_used(now)
+    db.add(otp_code)
+    db.commit()
+
+    return admin
