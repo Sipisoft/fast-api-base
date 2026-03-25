@@ -1,0 +1,24 @@
+fastapi==0.116.1
+uvicorn==0.35.0
+sqlalchemy==2.0.41
+bcrypt==3.2.2
+passlib==1.7.4
+python-jose
+python-multipart
+python-dotenv
+psycopg2==2.9.10
+pydantic[email]==2.12.0
+fastapi-mail
+requests==2.32.4
+pytest==8.4.2
+alembic==1.16.4
+jinja2==3.1.6
+celery==5.5.3
+redis==6.2.0
+opencv-python-headless
+numpy<=2.2.9
+requests== 2.32.4 
+crypto==1.4.1
+pydantic==2.12.0
+elastic-apm
+openpyxl
