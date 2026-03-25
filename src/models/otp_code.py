@@ -15,7 +15,8 @@ class OtpCode(Base):
 
     id = Column(pgUUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     admin_id = Column(pgUUID(as_uuid=True), ForeignKey("admins.id"), index=True, nullable=False)
-    code_hash = Column(String, nullable=False)
+    code = Column(String, nullable=False)
+    secret = Column(String, nullable=True, index=True)
     purpose = Column(String, nullable=False, default=OtpPurpose.LOGIN)
     expires_at = Column(DateTime, nullable=False)
     attempts = Column(Integer, nullable=False, default=0)
