@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 
 from sqlalchemy.orm import Session
 
-from src.utils.auth import send_otp_email, verify_email_otp, create_access_token
+from src.utils.auth import send_otp_email, verify_email_otp, verify_magic_link, create_access_token
 
 
 router = APIRouter(prefix="/auth", dependencies=[], tags=["auth"],redirect_slashes=False)
@@ -27,5 +27,11 @@ async def get_auth_otp(request: EmailOtpRequest, db: Session = Depends(get_db)):
 async def verify_auth_otp(request: EmailOtpVerifyRequest, db: Session = Depends(get_db)):
 
     admin = await verify_email_otp(request.email, request.otp, db)
+    access_token = create_access_token({"sub": admin.username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@router.get("/magic-link", description="Verify magic link for email-based authentication", status_code=status.HTTP_200_OK)
+async def verify_magic_link_login(token: str, db: Session = Depends(get_db)):
+    admin = await verify_magic_link(token, db)
     access_token = create_access_token({"sub": admin.username})
     return {"access_token": access_token, "token_type": "bearer"}

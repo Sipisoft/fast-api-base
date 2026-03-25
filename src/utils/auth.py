@@ -3,6 +3,7 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from uuid import uuid4
 
 from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordBearer
@@ -18,6 +19,7 @@ from src.models.api_client_token import ApiClientToken
 from src.models.api_key import ApiKey
 from src.models.otp_code import OtpCode, OtpPurpose
 from src.utils.hash import Hash
+from src.workers.tasks import send_otp_email_task
 
 oauth2_schema = OAuth2PasswordBearer(tokenUrl="token")
 SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
@@ -33,10 +35,10 @@ OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv("OTP_RESEND_COOLDOWN_SECONDS", "60")
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    if expires_delta: 
+    if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
-    else: 
-        expire = datetime.now(timezone.utc) + timedelta(minutes = ACCESS_TOKEN_EXPIRE_MINUTES)
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -120,6 +122,10 @@ def generate_otp()->str:
     return "".join(str(secrets.randbelow(10)) for _ in range(6))
 
 
+def generate_magic_link_token() -> str:
+    return str(uuid4())
+
+
 async def send_otp_email(email:EmailStr,db: Session):
 
     try:
@@ -144,9 +150,11 @@ async def send_otp_email(email:EmailStr,db: Session):
             )
 
         otp = generate_otp()
+        magic_token = generate_magic_link_token()
         otp_code = OtpCode(
             admin_id=admin.id,
-            code_hash=Hash.encrypt(otp),
+            code=Hash.encrypt(otp),
+            secret=magic_token,
             purpose=OtpPurpose.LOGIN,
             expires_at=now + timedelta(minutes=OTP_EXPIRY_MINUTES),
             max_attempts=OTP_MAX_ATTEMPTS,
@@ -155,15 +163,58 @@ async def send_otp_email(email:EmailStr,db: Session):
         db.commit()
         db.refresh(otp_code)
 
-        await OTPMailer(admin, otp).send()
+        try:
+            send_otp_email_task.delay(admin_id=admin.id, otp=otp, magic_token=magic_token)
+        except Exception:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to enqueue OTP email. Please try again later."
+            )
+
+        return
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send OTP. Please try again later."
         )
+
+
+async def verify_magic_link(token: str, db: Session) -> Admin:
+
+    now = datetime.utcnow()
+    otp_code = (
+        db.query(OtpCode)
+        .filter(
+            OtpCode.secret == token,
+            OtpCode.purpose == OtpPurpose.LOGIN,
+            OtpCode.active == True,  # noqa: E712
+        )
+        .order_by(OtpCode.created_at.desc())
+        .first()
+    )
+    if otp_code is None or otp_code.is_expired(now):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Magic link is invalid or has expired. Please request a new one."
+        )
+
+    admin = db.query(Admin).filter(Admin.id == otp_code.admin_id).first()
+    if admin is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Magic link is invalid."
+        )
+
+    # Mark magic link as used and inactive (single-use)
+    otp_code.mark_used(now)
+    db.add(otp_code)
+    db.commit()
+
+    return admin
 
 
 async def verify_email_otp(email: EmailStr, otp: str, db: Session) -> Admin:
@@ -195,7 +246,7 @@ async def verify_email_otp(email: EmailStr, otp: str, db: Session) -> Admin:
         )
 
     # Verify OTP
-    if not Hash.verify(otp, otp_code.code_hash):
+    if not Hash.verify(otp, otp_code.code):
         otp_code.register_failed_attempt(now, OTP_LOCKOUT_MINUTES)
         db.add(otp_code)
         db.commit()

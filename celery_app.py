@@ -6,7 +6,8 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 celery_app = Celery(
     "worker",
     broker=CELERY_BROKER_URL,
-    backend=CELERY_BROKER_URL,  
+    backend=CELERY_BROKER_URL,
+    include=["src.workers.tasks"],
 )
 
 celery_app.conf.update(
@@ -16,3 +17,4 @@ celery_app.conf.update(
     timezone='UTC',
     enable_utc=True,
 )
+import src.models  # noqa: E402, F401
