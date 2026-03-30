@@ -7,6 +7,10 @@ from src.db.database import get_db,Base
 from src.utils.auth import get_current_admin
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from contextlib import contextmanager
+from src.models import Admin
+from fastapi import HTTPException, status
+
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
 engine = create_engine(
@@ -34,13 +38,42 @@ def db_session():
     finally:
         session.close()
 def override_get_current_admin():
-    return {
-        "id":uuid.uuid4(),
-        "email":"test@test.com",
-        "role_id":uuid.uuid4(),
-    }
+    return Admin(
+        id=uuid.uuid4(),
+        email="test@test.com",
+        role_id=uuid.uuid4(),
+        username="testuser",
+        name="Test User",
+        active=True,
+        created_at="2023-01-01T00:00:00Z",
+        updated_at="2023-01-01T00:00:00Z",
+    )
+    # return {
+    #     "id":uuid.uuid4(),
+    #     "email":"test@test.com",
+    #     "role_id":uuid.uuid4(),
+    #     "username":"testuser",
+    #     "name":"Test User",
+    #     "active":True,
+    #     "created_at":"2023-01-01T00:00:00Z",
+    #     "updated_at":"2023-01-01T00:00:00Z",
+    # }
+
+def fake_current_admin_unauthenticated():
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
 app.dependency_overrides[get_current_admin] = override_get_current_admin
+
+
+
+@contextmanager
+def override_dependency(dep, new_dep):
+    app.dependency_overrides[dep] = new_dep
+    try:
+        yield
+    finally:
+        app.dependency_overrides.pop(dep, None)
+
 
 @pytest.fixture
 def client(db_session):
