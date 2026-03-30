@@ -126,7 +126,7 @@ def generate_magic_link_token() -> str:
     return str(uuid4())
 
 
-async def send_otp_email(email:EmailStr,db: Session):
+def send_otp_email(email:EmailStr,db: Session):
 
     try:
         admin = get_admin_by_email(db,email=email)
@@ -183,7 +183,7 @@ async def send_otp_email(email:EmailStr,db: Session):
         )
 
 
-async def verify_magic_link(token: str, db: Session) -> Admin:
+def verify_magic_link(token: str, db: Session) -> Admin:
 
     now = datetime.utcnow()
     otp_code = (
@@ -217,7 +217,7 @@ async def verify_magic_link(token: str, db: Session) -> Admin:
     return admin
 
 
-async def verify_email_otp(email: EmailStr, otp: str, db: Session) -> Admin:
+def verify_email_otp(email: EmailStr, otp: str, db: Session) -> Admin:
 
     admin = get_admin_by_email(db, email=email)
     now = datetime.utcnow()
@@ -256,9 +256,10 @@ async def verify_email_otp(email: EmailStr, otp: str, db: Session) -> Admin:
             detail="Invalid OTP."
         )
 
-    # Successful verification: mark OTP as used and inactive
     otp_code.mark_used(now)
     db.add(otp_code)
     db.commit()
 
     return admin
+
+

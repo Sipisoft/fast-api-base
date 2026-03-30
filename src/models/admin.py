@@ -152,8 +152,12 @@ def delete(db:Session, id: int, current_admin: Admin):
     db.delete(db_admin)
     db.commit()
     return db_admin
-def get(db: Session, id: int, current_admin: Admin) -> Admin:
-    return get_admins(db, current_admin).filter(Admin.id == id).first()
+
+def get(db: Session, id: UUID, current_admin: Admin) -> Admin:
+    admin = get_admins(db, current_admin).filter(Admin.id == id).first()
+    if not admin:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin not found")
+    return admin
     
 
 def get_all(db: Session, current_admin: Admin, pagination: Pagination) -> PaginatedResponse[AdminResponse]:
