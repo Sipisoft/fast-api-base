@@ -80,7 +80,7 @@ async def create(db: Session, user: UserRequest, current_user: User , request: R
         )
 
 
-def update(db: Session, id: UUID, user: UserRequest, current_user: User):
+def update_user(db: Session, id: UUID, user: UserRequest, current_user: User):
     db_user = get_users(db, current_user).filter(User.id == id).first()
 
     if db_user is None:
