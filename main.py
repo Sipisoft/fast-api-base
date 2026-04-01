@@ -70,7 +70,7 @@ external_app.add_middleware(
 
 
 app.include_router(token_router)
-# app.include_router(accounts_router)
+app.include_router(external_token_router)
 app.include_router(admins_router)
 app.include_router(roles_router)
 app.include_router(permissions_router)
