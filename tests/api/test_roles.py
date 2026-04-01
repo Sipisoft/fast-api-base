@@ -5,6 +5,8 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch
 from datetime import datetime
 from src.models.role import Role
+from tests.conftest import override_dependency,fake_current_admin_unauthenticated
+from src.utils.auth import get_current_admin
 
 @patch("src.api.roles.get_all")
 def test_get_roles(mock_get_all,client:TestClient):
@@ -121,4 +123,52 @@ def test_update_action_bad_action(mock_role_actions,client:TestClient):
     response = client.put(f"/roles/{fake_id}/{fake_action}")
     assert response.status_code == 400
     assert response.json()["detail"] == "Invalid action"
+
+def test_get_roles_unauthenticated(client:TestClient):
+    with override_dependency(get_current_admin, fake_current_admin_unauthenticated):
+        response = client.get("/roles")
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Not authenticated"
+
+def test_role_unauthenticated(client:TestClient):
+    with override_dependency(get_current_admin, fake_current_admin_unauthenticated):
+        fake_id = uuid.uuid4()
+        response = client.get(f"/roles/{fake_id}")
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Not authenticated"
+
+
+def test_create_role_unauthenticated(client:TestClient):
+    with override_dependency(get_current_admin, fake_current_admin_unauthenticated):
+        request_payload = {
+            "name": "newrole",
+            "description": "New role",
+            "permission_ids":[]
+        }
+        response = client.post("/roles",json=request_payload)
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Not authenticated"
+
+
+def test_update_role_unauthenticated(client:TestClient):
+    with override_dependency(get_current_admin, fake_current_admin_unauthenticated):
+        fake_id = uuid.uuid4()
+        request_payload = {
+            "name": "updatedrole",
+            "description": "Updated role",
+            "permission_ids":[]
+        }
+        response = client.put(f"/roles/{fake_id}",json=request_payload)
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Not authenticated"
+
+
+def test_update_action_unauthenticated(client:TestClient):
+    with override_dependency(get_current_admin, fake_current_admin_unauthenticated):
+        fake_id = uuid.uuid4()
+        fake_action = "deactivate"
+        response = client.put(f"/roles/{fake_id}/{fake_action}")
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Not authenticated"
+
 

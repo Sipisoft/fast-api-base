@@ -1,5 +1,5 @@
 
-from operator import and_, or_
+from sqlalchemy import and_, or_
 from src.db.database import get_db
 from fastapi import APIRouter, Depends, status, HTTPException
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm

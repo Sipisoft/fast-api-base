@@ -48,16 +48,7 @@ def override_get_current_admin():
         created_at="2023-01-01T00:00:00Z",
         updated_at="2023-01-01T00:00:00Z",
     )
-    # return {
-    #     "id":uuid.uuid4(),
-    #     "email":"test@test.com",
-    #     "role_id":uuid.uuid4(),
-    #     "username":"test user",
-    #     "name":"Test User",
-    #     "active":True,
-    #     "created_at":"2023-01-01T00:00:00Z",
-    #     "updated_at":"2023-01-01T00:00:00Z",
-    # }
+
 
 def fake_current_admin_unauthenticated():
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
@@ -68,11 +59,15 @@ app.dependency_overrides[get_current_admin] = override_get_current_admin
 
 @contextmanager
 def override_dependency(dep, new_dep):
+    old_dep = app.dependency_overrides.get(dep)
     app.dependency_overrides[dep] = new_dep
     try:
         yield
     finally:
-        app.dependency_overrides.pop(dep, None)
+        if old_dep is not None:
+            app.dependency_overrides[dep] = old_dep
+        else:
+            app.dependency_overrides.pop(dep, None)
 
 
 @pytest.fixture
