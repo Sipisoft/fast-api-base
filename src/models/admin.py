@@ -1,6 +1,5 @@
 
 from datetime import datetime, timedelta
-from email.policy import default
 from enum import Enum
 from typing import Optional
 from uuid import UUID

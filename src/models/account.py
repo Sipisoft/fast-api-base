@@ -12,7 +12,6 @@ class AccountBase(Base):
     name=Column(String, unique=False, nullable=True)
     password = Column(String)
     email = Column(String, unique=True)
-
     password_reset_token = Column(String, unique=True, nullable=True)
     password_reset_token_expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=True)

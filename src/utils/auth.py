@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
 import base64
-from functools import partial
 from typing import Optional
 from src.models.admin import Admin, AdminType
+from src.models.users import User
 from src.models.api_key import ApiKey
 from src.db.database import get_db
 from fastapi.security import OAuth2PasswordBearer
@@ -12,7 +12,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound
 from jose import jwt
 from src.utils.hash import Hash
+from typing import TypeVar,Type
+from src.models.account import AccountBase
 
+T = TypeVar("T", bound=AccountBase)
 oauth2_schema = OAuth2PasswordBearer(tokenUrl="token")
 SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
 ALGORITHM = "HS256"
@@ -30,7 +33,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 
 
-def get_user(token: str = Depends(oauth2_schema), db: Session = Depends(get_db)):
+def get_account(account:Type[T],token: str = Depends(oauth2_schema), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
@@ -46,11 +49,10 @@ def get_user(token: str = Depends(oauth2_schema), db: Session = Depends(get_db))
             
             raise credentials_exception
     
-        model_name = Admin
-        
-        if not model_name:
+
+        if not account:
             raise credentials_exception
-        user = db.query(model_name).filter(model_name.username == username).first()
+        user = db.query(account).filter(account.username == username).first()
         
         if not user or user is None:
             raise credentials_exception
@@ -60,12 +62,18 @@ def get_user(token: str = Depends(oauth2_schema), db: Session = Depends(get_db))
         raise credentials_exception
 
 
-# def get_current_user(token: str = Depends(oauth2_schema), db: Session = Depends(get_db)) -> User:
-#     return get_user(token, db, "user")
+def get_current_admin(
+        token: str = Depends(oauth2_schema),
+        db: Session = Depends(get_db)
+) -> Admin:
+    return get_account(Admin, token, db)
 
-def get_current_admin(token: str = Depends(oauth2_schema), db: Session = Depends(get_db)) -> Admin:
-    user =  get_user(token, db)
-    return user
+
+def get_current_user(
+        token: str = Depends(oauth2_schema),
+        db: Session = Depends(get_db)
+) -> User:
+    return get_account(User, token, db)
 
 def get_current_api_key(authorization: str = Header(...) , db: Session = Depends(get_db)) -> ApiKey:
     print("AUTHORIZATION", authorization)

@@ -43,7 +43,6 @@ class UserResponse(BaseModel):
     email: str
     name: str
     active: bool
-    role_id: UUID
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
@@ -81,7 +80,7 @@ async def create(db: Session, user: UserRequest, current_user: User , request: R
         )
 
 
-def update(db: Session, id: int, user: UserRequest, current_user: User):
+def update(db: Session, id: UUID, user: UserRequest, current_user: User):
     db_user = get_users(db, current_user).filter(User.id == id).first()
 
     if db_user is None:
@@ -94,12 +93,12 @@ def update(db: Session, id: int, user: UserRequest, current_user: User):
     return db_user
 
 
-async def user_actions(db: Session, id: int, current_user: User, action_name: str, request: Request) -> User:
+async def user_actions(db: Session, id: UUID, current_user: User, action_name: str, request: Request = None) -> User:
 
     db_user = get_users(db, current_user).filter(User.id == id).first()
 
     if db_user is None:
-        raise HTTPException(status_code=404, detail="user not found")
+        raise HTTPException(status_code=404, detail="User not found")
 
     if action_name == "deactivate":
         db_user.active = False
@@ -124,7 +123,7 @@ async def user_actions(db: Session, id: int, current_user: User, action_name: st
         await PasswordResetMailer(db_user, token,False, request).send()
         return db_user
 
-def delete(db:Session, id: int, current_user: User):
+def delete(db:Session, id: UUID, current_user: User):
     db_user = get_users(db, current_user).filter(User.id == id).first()
     if db_user is None:
         raise HTTPException(status_code=404, detail="user not found")
@@ -132,7 +131,7 @@ def delete(db:Session, id: int, current_user: User):
     db.commit()
     return db_user
 
-def get(db: Session, id: int, current_user: User) -> User:
+def get(db: Session, id: UUID, current_user: User) -> User:
     return get_users(db, current_user).filter(User.id == id).first()
 
 
