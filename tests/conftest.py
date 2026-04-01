@@ -53,9 +53,12 @@ def override_get_current_admin():
 def fake_current_admin_unauthenticated():
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
-app.dependency_overrides[get_current_admin] = override_get_current_admin
 
-
+@pytest.fixture(autouse=True)
+def reset_auth_override():
+    app.dependency_overrides[get_current_admin] = override_get_current_admin
+    yield
+    app.dependency_overrides[get_current_admin] = override_get_current_admin
 
 @contextmanager
 def override_dependency(dep, new_dep):
