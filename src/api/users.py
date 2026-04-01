@@ -25,5 +25,3 @@ def update(id: int,  current_admin: Admin = Depends(get_current_admin), user: Us
 def update_action(id: int,action_name: str,  current_admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     return user_actions(db, id,  current_admin, action_name)
 
-# async def get_users(db: Session = Depends(get_db)):
-#     return db.query(User).all()
