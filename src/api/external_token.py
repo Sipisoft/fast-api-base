@@ -5,7 +5,7 @@ from src.utils.auth import get_current_api_key
 from src.models.api_key import ApiKey
 from sqlalchemy.orm import Session 
 from src.db.database import get_db
-from src.models.api_client_token import   create as create_api_token
+from src.models.api_client_token import create as create_api_token
 router = APIRouter(prefix='/token', tags=["token"],redirect_slashes=False)
 
 
