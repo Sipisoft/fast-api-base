@@ -1,5 +1,6 @@
 import uuid
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 from datetime import datetime
@@ -60,3 +61,64 @@ def test_create_role(client:TestClient):
     response = client.post("/roles",json=request_payload)
     assert response.status_code == 201
     assert response.json()["name"] == "newrole"
+
+@patch("src.api.roles.update")
+def test_update_role(mock_update,client:TestClient):
+    fake_id = uuid.uuid4()
+    request_payload = {
+        "name": "updatedrole",
+        "description": "Updated role",
+        "permission_ids":[]
+    }
+    mock_update.return_value = {
+        **request_payload,
+        "id": fake_id,
+        "active": True,
+        "permissions": [],
+    }
+
+    response = client.put(f"/roles/{fake_id}",json=request_payload)
+    assert response.status_code == 200
+    assert response.json()["name"] == "updatedrole"
+    assert response.json()["description"] == "Updated role"
+
+def test_update_role_not_found(client:TestClient):
+    fake_id = uuid.uuid4()
+    request_payload = {
+        "name": "updatedrole",
+        "description": "Updated role",
+        "permission_ids":[]
+    }
+    response = client.put(f"/roles/{fake_id}",json=request_payload)
+    assert response.status_code == 404
+
+@patch("src.api.roles.role_actions")
+def test_update_action(mock_role_actions,client:TestClient):
+    fake_id = uuid.uuid4()
+    fake_action = "deactivate"
+    mock_role_actions.return_value = {
+        "id": fake_id,
+        "name": "admin",
+        "description": "Admin role",
+        "active": False,
+        "permissions":[]
+    }
+    response = client.put(f"/roles/{fake_id}/{fake_action}")
+    assert response.status_code == 200
+    assert response.json()["active"] == False
+
+def test_update_action_not_found(client:TestClient):
+    fake_id = uuid.uuid4()
+    fake_action = ""
+    response = client.put(f"/roles/{fake_id}/{fake_action}")
+    assert response.status_code == 404
+
+@patch("src.api.roles.role_actions")
+def test_update_action_bad_action(mock_role_actions,client:TestClient):
+    fake_id = uuid.uuid4()
+    fake_action = "badaction"
+    mock_role_actions.side_effect = HTTPException(status_code=400, detail="Invalid action")
+    response = client.put(f"/roles/{fake_id}/{fake_action}")
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid action"
+
