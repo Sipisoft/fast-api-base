@@ -5,7 +5,7 @@ from main import app
 from src.utils.auth import get_current_admin
 
 from unittest.mock import patch
-
+from tests.conftest import override_dependency,fake_current_admin_unauthenticated
 @patch("src.api.admins.get_admin")
 def test_show_admin(mock_admin, client):
     test_id = uuid.uuid4()
@@ -136,61 +136,51 @@ def test_update_admin_not_found(mock_update_admin,client):
     assert response.status_code == 404
     assert response.json()["detail"] == "Admin not found"
 
-def fake_current_admin_unauthenticated():
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
 def test_index_unauthenticated(client):
-    app.dependency_overrides[get_current_admin] = fake_current_admin_unauthenticated
+    with override_dependency(get_current_admin, fake_current_admin_unauthenticated):
 
-    response = client.get("/admins")
-    assert response.status_code == 401
-    assert response.json()["detail"] == "Not authenticated"
-
-    app.dependency_overrides.pop(get_current_admin)
+        response = client.get("/admins")
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Not authenticated"
 
 
 def test_show_unauthenticated(client):
-    app.dependency_overrides[get_current_admin] = fake_current_admin_unauthenticated
-
-    test_id = uuid.uuid4()
-    response = client.get(f"/admins/{test_id}")
-    assert response.status_code == 401
-    assert response.json()["detail"] == "Not authenticated"
-
-    app.dependency_overrides.pop(get_current_admin)
+    with override_dependency(get_current_admin, fake_current_admin_unauthenticated):
+        test_id = uuid.uuid4()
+        response = client.get(f"/admins/{test_id}")
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Not authenticated"
 
 
 def test_create_admin_unauthenticated(client):
-    app.dependency_overrides[get_current_admin] = fake_current_admin_unauthenticated
+    with override_dependency(get_current_admin, fake_current_admin_unauthenticated):
+        request_payload = {
+            "username": "newadmin",
+            "email": "newadmin@test.com",
+            "role_id": str(uuid.uuid4()),
+            "name": "New Admin",
+            "active": True
+        }
 
-    request_payload = {
-        "username": "newadmin",
-        "email": "newadmin@test.com",
-        "role_id": str(uuid.uuid4()),
-        "name": "New Admin",
-        "active": True
-    }
+        response = client.post("/admins", json=request_payload)
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Not authenticated"
 
-    response = client.post("/admins", json=request_payload)
-    assert response.status_code == 401
-    assert response.json()["detail"] == "Not authenticated"
-
-    app.dependency_overrides.pop(get_current_admin)
 
 def test_update_admin_unauthenticated(client):
-    app.dependency_overrides[get_current_admin] = fake_current_admin_unauthenticated
+    with override_dependency(get_current_admin, fake_current_admin_unauthenticated):
+        request_payload = {
+            "username": "updatedadmin",
+            "email": "updated@test.com",
+            "role_id": str(uuid.uuid4()),
+            "name": "Updated Admin",
+            "active": True
+        }
 
-    request_payload = {
-        "username": "updatedadmin",
-        "email": "updated@test.com",
-        "role_id": str(uuid.uuid4()),
-        "name": "Updated Admin",
-        "active": True
-    }
+        admin_id = uuid.uuid4()
+        response = client.put(f"/admins/{admin_id}", json=request_payload)
 
-    admin_id = uuid.uuid4()
-    response = client.put(f"/admins/{admin_id}", json=request_payload)
-
-    assert response.status_code == 401
-    assert response.json()["detail"] == "Not authenticated"
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Not authenticated"
 

@@ -6,11 +6,10 @@ from src.db.database import get_db,Base
 from src.utils.auth import get_current_admin
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from contextlib import contextmanager
+from src.models import Admin
 from src.utils.auth import get_current_admin,get_current_user
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from contextlib import contextmanager
-from src.models.admin import Admin
 from src.models.users import User
 
 from fastapi import HTTPException, status
@@ -52,6 +51,30 @@ def override_get_current_admin():
         created_at="2023-01-01T00:00:00Z",
         updated_at="2023-01-01T00:00:00Z",
     )
+
+
+
+def fake_current_admin_unauthenticated():
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+
+@pytest.fixture(autouse=True)
+def reset_auth_override():
+    app.dependency_overrides[get_current_admin] = override_get_current_admin
+    yield
+    app.dependency_overrides[get_current_admin] = override_get_current_admin
+
+@contextmanager
+def override_dependency(dep, new_dep):
+    old_dep = app.dependency_overrides.get(dep)
+    app.dependency_overrides[dep] = new_dep
+    try:
+        yield
+    finally:
+        if old_dep is not None:
+            app.dependency_overrides[dep] = old_dep
+        else:
+            app.dependency_overrides.pop(dep, None)
 
 def override_get_current_user():
     return User(

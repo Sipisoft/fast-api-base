@@ -54,7 +54,7 @@ def create(db: Session, role: RoleRequest):
     return db_role
 
 def update(db:Session, id: uuid.UUID, role: RoleRequest):
-    db_role = db.query(Role).filter(Role.id == id).first()
+    db_role = get_one(db, id)
     db_role = set_field_values(db_role, role)
     db_role.permissions = db.query(Permission).filter(Permission.id.in_(role.permission_ids)).all() if role.permission_ids is not None else []
     db.commit()
@@ -93,5 +93,8 @@ async def actions(db: Base, id: uuid.UUID,  action_name: str, request: Request) 
         db_role.active = True
         db.commit()
         db.refresh(db_role)
-        return db_role 
+        return db_role
+
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action")
    

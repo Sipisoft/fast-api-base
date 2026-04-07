@@ -1,10 +1,12 @@
 import os
 from src.mailers.base_mailer import BaseMailer
 from fastapi import Request
+from fastapi_mail import MessageSchema
+from typing import TYPE_CHECKING
 from src.models.admin import Admin
 from src.models.user import User
-from fastapi_mail import MessageSchema
 from typing import Optional, TypeVar, Generic
+
 
 T = TypeVar("T",User,Admin)
 class PasswordResetMailer(BaseMailer):

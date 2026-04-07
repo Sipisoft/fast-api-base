@@ -28,10 +28,10 @@ def send_otp_email_task(admin_id: int, otp: str, magic_token: str) -> None:
         db.close()
 
 
-
 class AccountType(str, Enum):
     admin = "admin"
     user = "user"
+
 @celery_app.task(name="send_password_reset_email_task")
 def send_password_reset_email_task(admin_id: str, account_type: AccountType, new_password: bool) -> None:
 
