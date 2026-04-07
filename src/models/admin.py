@@ -1,9 +1,7 @@
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Optional
-from uuid import UUID
-
-
+from uuid import UUID, uuid4
 from src.models.role import RoleResponse
 from src.db.database import Base
 from sqlalchemy import Column,ForeignKey, Enum as SQLAlchemyEnum
@@ -17,6 +15,7 @@ from src.utils.models import PaginatedResponse, Pagination, set_field_values
 from .account import AccountBase
 from src.workers.send_email import trigger_password_reset_email
 
+
 class AdminType(str, Enum):
     internal = "internal"
     external = "external"
@@ -28,7 +27,7 @@ class Admin(AccountBase):
     role_id = Column(pgUUId(as_uuid=True), ForeignKey('roles.id'), index=True, nullable=True)
     role = relationship("Role", back_populates="admins")
     api_keys = relationship("ApiKey", back_populates="admin")
-    
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         
@@ -141,8 +140,12 @@ def delete(db:Session, id: int, current_admin: Admin):
     db.delete(db_admin)
     db.commit()
     return db_admin
-def get(db: Session, id: int, current_admin: Admin) -> Admin:
-    return get_admins(db, current_admin).filter(Admin.id == id).first()
+
+def get(db: Session, id: UUID, current_admin: Admin) -> Admin:
+    admin = get_admins(db, current_admin).filter(Admin.id == id).first()
+    if not admin:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin not found")
+    return admin
     
 
 def get_all(db: Session, current_admin: Admin, pagination: Pagination) -> PaginatedResponse[AdminResponse]:
@@ -169,3 +172,19 @@ def set_new_password(db: Session, password_reset_request: AdminPasswordResetRequ
     db.commit()
     db.refresh(admin)
     return admin
+
+class EmailOtpRequest(BaseModel):
+    email: EmailStr = Field(..., title= "Email", description= "Email of the User")
+
+class EmailOtpVerifyRequest(BaseModel):
+    email: EmailStr = Field(..., title="Email", description="Email of the User")
+    otp: str = Field(..., min_length=4, max_length=12, title="OTP", description="One-time password sent to the user")
+
+
+def get_admin_by_email(db: Session, email: EmailStr) -> Admin:
+     admin = db.query(Admin).filter(Admin.email == email).first()
+     if admin is None:
+         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin not found")
+     return admin
+
+

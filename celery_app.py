@@ -7,8 +7,9 @@ celery_app = Celery(
     "worker",
     broker=CELERY_BROKER_URL,
     backend=CELERY_BROKER_URL,
-
+    include=["src.workers.tasks"],
 )
+
 
 celery_app.autodiscover_tasks("src.workers")
 
@@ -19,3 +20,4 @@ celery_app.conf.update(
     timezone='UTC',
     enable_utc=True,
 )
+import src.models  # noqa: E402, F401

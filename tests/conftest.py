@@ -1,11 +1,11 @@
-
-
 import uuid
-
 import pytest
 from fastapi.testclient import TestClient
 from main import app
 from src.db.database import get_db,Base
+from src.utils.auth import get_current_admin
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from src.utils.auth import get_current_admin,get_current_user
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -89,7 +89,6 @@ def override_dependency(dep, new_dep):
         else:
             app.dependency_overrides.pop(dep, None)
 
-
 @pytest.fixture
 def client(db_session):
     def override_db():
@@ -97,4 +96,3 @@ def client(db_session):
 
     app.dependency_overrides[get_db] = override_db
     return TestClient(app)
-

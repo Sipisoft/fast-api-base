@@ -14,6 +14,8 @@ from src.api.api_keys import router as api_keys_router
 from src.api.external_token import router as external_token_router
 from src.api.users import router as user_router
 from src.db.database import  get_db
+from sqlalchemy.orm import Session
+from src.workers.tasks import send_otp_email_task
 from fastapi.middleware.cors import CORSMiddleware
 from elasticapm.contrib.starlette import ElasticAPM, make_apm_client
 origins = [
@@ -97,6 +99,20 @@ def health_check():
 Base.metadata.create_all(bind=engine)
 db = next(get_db())
 populate_permissions(db)
+
+@app.on_event("startup")
+async def warm_up_dependencies():
+
+    try:
+        db: Session = next(get_db())
+        db.execute("SELECT 1")
+    except Exception:
+        pass
+    try:
+        send_otp_email_task.delay(admin_id=-1, otp="000000", magic_token="warmup")
+    except Exception:
+        pass
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=os.getenv("ENVIRONMENT") != "production")
 
