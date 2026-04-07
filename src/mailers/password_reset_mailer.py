@@ -19,7 +19,11 @@ class PasswordResetMailer(BaseMailer):
 
 
     async def send(self):
-        set_password_link = f"{os.getenv('FRONTEND_URL')}/set-password?token={ self.password_token }&new_password={self.new_password}"
+        frontend_url = os.getenv('FRONTEND_URL')
+        if not frontend_url and self.request:
+            frontend_url = f"{self.request.base_url}"
+        
+        set_password_link = f"{frontend_url}set-password?token={ self.password_token }&new_password={self.new_password}"
         print("Link", set_password_link)
         html_content = self.template.render(account=self.account, link=set_password_link, request = self.request, new_password=self.new_password)
 
