@@ -18,9 +18,9 @@ def  index (current_admin: Admin = Depends(get_current_admin), db: Session = Dep
 
 
 @router.post("", response_model=AdminResponse, status_code=status.HTTP_200_OK)
-async def create(admin: AdminRequest = Body(), current_admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db), request: Request = None):
+def create(admin: AdminRequest = Body(), current_admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db), request: Request = None):
     print("Current Admin", current_admin)
-    new_admin = await create_admin(db, admin, current_admin, request)
+    new_admin =  create_admin(db, admin, current_admin, request)
     return AdminResponse.model_validate(new_admin)
 
 @router.put("/{id}", response_model=AdminResponse, status_code=status.HTTP_200_OK)

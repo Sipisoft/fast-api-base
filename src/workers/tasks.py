@@ -1,15 +1,12 @@
-import src.models
 from src.mailers.otp_mailer import OTPMailer
-from src.models.admin import Admin
 from src.db.database import SessionLocal
 from celery_app import celery_app
-from fastapi import Request
 from src.mailers.password_reset_mailer import PasswordResetMailer
-from uuid import UUID
 from enum import Enum
 
 @celery_app.task(name="send_otp_email_task")
 def send_otp_email_task(admin_id: int, otp: str, magic_token: str) -> None:
+    from src.models.admin import Admin
 
     db = SessionLocal()
     try:
