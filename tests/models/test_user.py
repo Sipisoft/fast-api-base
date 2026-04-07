@@ -32,7 +32,7 @@ async def test_create_user_success(db_session, current_user):
         name="New User"
     )
     
-    with patch("src.mailers.password_reset_mailer.PasswordResetMailer.send", return_value=None) as mock_send:
+    with patch("src.models.users.trigger_password_reset_email") as mock_send:
         mock_request = MagicMock()
         db_user = await create(db_session, user_data, current_user, request=mock_request)
         
@@ -129,7 +129,7 @@ async def test_user_actions_reset_password(db_session, current_user):
     db_session.commit()
     db_session.refresh(user)
     
-    with patch("src.mailers.password_reset_mailer.PasswordResetMailer.send", return_value=None) as mock_send:
+    with patch("src.models.users.trigger_password_reset_email") as mock_send:
         result = await user_actions(db_session, user.id, current_user, "reset_password", MagicMock())
         assert result.password_reset_token is not None
         mock_send.assert_called_once()

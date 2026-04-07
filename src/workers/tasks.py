@@ -30,14 +30,17 @@ class AccountType(str, Enum):
     user = "user"
 
 @celery_app.task(name="send_password_reset_email_task")
-def send_password_reset_email_task(admin_id: str, account_type: AccountType, new_password: bool) -> None:
+def send_password_reset_email_task(account_id: str, account_type: AccountType, new_password: bool) -> None:
 
     from src.models.admin import Admin
+    from src.models.users import User
     db = SessionLocal()
     try:
         if account_type == AccountType.user:
-            return
-        account = db.query(Admin).filter(Admin.id == admin_id).first()
+            account = db.query(User).filter(User.id == account_id).first()
+        else:
+            account = db.query(Admin).filter(Admin.id == account_id).first()
+            
         if not account:
             return
 

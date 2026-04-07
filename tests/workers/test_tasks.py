@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 from src.workers.tasks import send_otp_email_task, send_password_reset_email_task, AccountType
+from src.models.users import User
 from src.models.admin import Admin
 from uuid import uuid4
 
@@ -65,13 +66,26 @@ def test_send_password_reset_email_task_success(mock_mailer_class, mock_session_
     mock_mailer_instance.send.assert_called_once()
     mock_db.close.assert_called_once()
 
-def test_send_password_reset_email_task_user_type():
-    # Current implementation returns immediately if account_type is user
-    # but it still opens the DB session because it's in the try block's parent scope?
-    # Wait, let's check the code again.
-    with patch("src.workers.tasks.SessionLocal") as mock_session_local:
-        mock_db = MagicMock()
-        mock_session_local.return_value = mock_db
-        send_password_reset_email_task("some-id", AccountType.user, True)
-        mock_session_local.assert_called_once()
-        mock_db.close.assert_called_once()
+@patch("src.workers.tasks.SessionLocal")
+@patch("src.workers.tasks.PasswordResetMailer")
+def test_send_password_reset_email_task_user_success(mock_mailer_class, mock_session_local):
+    # Setup
+    user_id = str(uuid4())
+    user = User(id=user_id, email="user@example.com", password_reset_token="token456")
+    
+    mock_db = MagicMock()
+    mock_session_local.return_value = mock_db
+    mock_db.query.return_value.filter.return_value.first.return_value = user
+    
+    mock_mailer_instance = MagicMock()
+    mock_mailer_instance.send = AsyncMock()
+    mock_mailer_class.return_value = mock_mailer_instance
+    
+    # Execute
+    send_password_reset_email_task(user_id, AccountType.user, False)
+    
+    # Assert
+    mock_db.query.assert_called()
+    mock_mailer_class.assert_called_once_with(user, "token456", False)
+    mock_mailer_instance.send.assert_called_once()
+    mock_db.close.assert_called_once()
