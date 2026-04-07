@@ -1,11 +1,14 @@
 import os
 from src.mailers.base_mailer import BaseMailer
 from fastapi import Request
-from src.models.admin import Admin
 from fastapi_mail import MessageSchema
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.models.admin import Admin
 
 class PasswordResetMailer(BaseMailer):
-    def __init__(self, admin: Admin, password_token: str, new_password: bool = False, request: Request = None, mailer=None):
+    def __init__(self, admin: "Admin", password_token: str, new_password: bool = False, request: Request = None, mailer=None):
         super().__init__(mailer)
         print("Password token", password_token)
         self.admin = admin
@@ -16,7 +19,11 @@ class PasswordResetMailer(BaseMailer):
 
 
     async def send(self):
-        set_password_link = f"{os.getenv('FRONTEND_URL')}/set-password?token={ self.password_token }&new_password={self.new_password}"
+        frontend_url = os.getenv('FRONTEND_URL')
+        if not frontend_url and self.request:
+            frontend_url = f"{self.request.base_url}"
+        
+        set_password_link = f"{frontend_url}set-password?token={ self.password_token }&new_password={self.new_password}"
         print("Link", set_password_link)
         html_content = self.template.render(admin=self.admin, link=set_password_link, request = self.request, new_password=self.new_password)
 
