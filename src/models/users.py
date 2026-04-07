@@ -1,7 +1,6 @@
-from sqlalchemy import Index
 from src.db.database import Base
 from pydantic import Field, BaseModel, EmailStr,ConfigDict
-from uuid import uuid4, UUID
+from uuid import  UUID
 from datetime import datetime,timedelta
 from sqlalchemy.orm import Session, Query
 from fastapi import Request,HTTPException, status
@@ -10,6 +9,7 @@ from src.utils.password import generate_strong_password
 from src.utils.models import PaginatedResponse, Pagination, set_field_values
 from typing import Optional
 from .account import AccountBase
+from src.workers.send_email import trigger_password_reset_email
 
 
 class User(AccountBase):
@@ -67,7 +67,7 @@ async def create(db: Session, user: UserRequest, current_user: User , request: R
         db.refresh(db_user)
         if request is not None:
             try:
-                await PasswordResetMailer(db_user, db_user.password_reset_token, True, request).send()
+                trigger_password_reset_email(db_user, "user", True)
             except Exception as e2:
                 print(f"Failed to send email for user: {db_user.email}")
 
@@ -113,14 +113,13 @@ async def user_actions(db: Session, id: UUID, current_user: User, action_name: s
         return db_user
 
     if action_name == "reset_password":
-        from src.mailers.password_reset_mailer import PasswordResetMailer
         token = Hash.generate_token()
         db_user.password_reset_token = token
         db_user.password_reset_token_expires_at = datetime.utcnow() + timedelta(minutes=15)
         db.commit()
         db.refresh(db_user)
 
-        await PasswordResetMailer(db_user, token,False, request).send()
+        trigger_password_reset_email(db_user, "user", False)
         return db_user
 
 def delete(db:Session, id: UUID, current_user: User):

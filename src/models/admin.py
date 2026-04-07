@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Optional
-from uuid import UUID, uuid4
+from uuid import UUID
 from src.models.role import RoleResponse
 from src.db.database import Base
 from sqlalchemy import Column,ForeignKey, Enum as SQLAlchemyEnum

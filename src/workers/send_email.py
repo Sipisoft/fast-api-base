@@ -10,5 +10,5 @@ class SendEmailWorker(BaseWorker):
 
 
 
-def trigger_password_reset_email(admin, account_type, new_password):
-    send_password_reset_email_task.delay(str(admin.id), account_type, new_password)
+def trigger_password_reset_email(account, account_type, new_password):
+    send_password_reset_email_task.delay(str(account.id), account_type, new_password)

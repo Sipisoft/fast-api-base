@@ -40,3 +40,4 @@ def create(db: Base, api_key: ApiKey) -> ApiClientToken:
 
 def get(db: Base, id: UUID)-> ApiClientToken: 
     token = db.query(ApiClientToken).filter(ApiClientToken.id == id).first()
+    return token
