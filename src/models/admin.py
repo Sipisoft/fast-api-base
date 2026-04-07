@@ -4,7 +4,7 @@ from typing import Optional
 from uuid import UUID, uuid4
 from src.models.role import RoleResponse
 from src.db.database import Base
-from sqlalchemy import Column, DateTime, String, Boolean, ForeignKey, Enum as SQLAlchemyEnum, func
+from sqlalchemy import Column,ForeignKey, Enum as SQLAlchemyEnum
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from sqlalchemy.orm import Session, relationship
 from fastapi import HTTPException, status, Request
@@ -12,6 +12,7 @@ from src.utils.hash import Hash
 from src.utils.password import generate_strong_password
 from sqlalchemy.dialects.postgresql import UUID as pgUUId
 from src.utils.models import PaginatedResponse, Pagination, set_field_values
+from .account import AccountBase
 from src.workers.send_email import trigger_password_reset_email
 
 
@@ -19,23 +20,12 @@ class AdminType(str, Enum):
     internal = "internal"
     external = "external"
     
-class Admin(Base):
+class Admin(AccountBase):
     __tablename__ = "admins"
-    id = Column(pgUUId(as_uuid=True), default=uuid4,primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
-    name=Column(String, unique=False, index=False, nullable=True)
-    password = Column(String)
-    email = Column(String, unique=True, index=True)
+
     type= Column(SQLAlchemyEnum(AdminType), index=True,  nullable=False, unique=False )
     role_id = Column(pgUUId(as_uuid=True), ForeignKey('roles.id'), index=True, nullable=True)
     role = relationship("Role", back_populates="admins")
-
-    password_reset_token = Column(String, unique=True, index=True, nullable=True)
-    password_reset_token_expires_at = Column(DateTime, nullable=True)
-
-    created_at = Column(DateTime, server_default=func.now(), nullable=True)
-    updated_at = Column(DateTime, server_default=func.now(), nullable=True)
-    active = Column(Boolean, default=True)
     api_keys = relationship("ApiKey", back_populates="admin")
 
     def __init__(self, **kwargs):
