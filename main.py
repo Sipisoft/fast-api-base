@@ -11,7 +11,8 @@ from src.api.profile import router as profile_router
 from src.api.permissions import router as permissions_router
 from src.api.auth import router as auth_router
 from src.api.api_keys import router as api_keys_router
-from src.api.external_token import router as external_token_router 
+from src.api.external_token import router as external_token_router
+from src.api.users import router as user_router
 from src.db.database import  get_db
 from fastapi.middleware.cors import CORSMiddleware
 from elasticapm.contrib.starlette import ElasticAPM, make_apm_client
@@ -73,6 +74,7 @@ app.include_router(admins_router)
 app.include_router(roles_router)
 app.include_router(permissions_router)
 app.include_router(profile_router)
+app.include_router(user_router)
 
 
 
