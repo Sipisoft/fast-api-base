@@ -12,6 +12,7 @@ from src.utils.hash import Hash
 from src.utils.password import generate_strong_password
 from sqlalchemy.dialects.postgresql import UUID as pgUUId
 from src.utils.models import PaginatedResponse, Pagination, set_field_values
+from src.workers.send_email import trigger_password_reset_email
 
 class AdminType(str, Enum):
     internal = "internal"
@@ -74,9 +75,8 @@ class AdminResponse(BaseModel):
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
-async def create(db: Session, admin: AdminRequest, current_admin: Admin , request: Request = None) -> Admin:
-    from src.mailers.password_reset_mailer import PasswordResetMailer
-    
+def create(db: Session, admin: AdminRequest, current_admin: Admin , request: Request = None) -> Admin:
+
     try:
         db_admin = Admin()
         db_admin = set_field_values(db_admin, admin)
@@ -90,8 +90,8 @@ async def create(db: Session, admin: AdminRequest, current_admin: Admin , reques
         db.commit()
         db.refresh(db_admin)
         if request is not None:
-            try: 
-                await PasswordResetMailer(db_admin, db_admin.password_reset_token, True, request).send()
+            try:
+                trigger_password_reset_email(db_admin, "admin", True)
             except Exception as e2:
                 print(f"Failed to send email for admin: {db_admin.email}")
         
@@ -116,7 +116,7 @@ def update(db: Session, id: int, admin: AdminRequest, current_admin: Admin):
     return db_admin
 
 
-async def admin_actions(db: Session, id: int, current_admin: Admin, action_name: str, request: Request) -> Admin:
+def admin_actions(db: Session, id: int, current_admin: Admin, action_name: str, request: Request) -> Admin:
     #PLUG ACCESS CONTROL
     db_admin = get_admins(db, current_admin).filter(Admin.id == id).first()
 
@@ -132,18 +132,15 @@ async def admin_actions(db: Session, id: int, current_admin: Admin, action_name:
         db.commit()
         db.refresh(db_admin)
         return db_admin 
-    if action_name == "reset_password": 
-        from src.mailers.password_reset_mailer import PasswordResetMailer
+    if action_name == "reset_password":
         token = Hash.generate_token()
-        #Send password via email 
-        print("This is toke", token)
         db_admin.password_reset_token = token
         db_admin.password_reset_token_expires_at = datetime.utcnow() + timedelta(minutes=15)
         db.commit()
         db.refresh(db_admin)
-        
-        await PasswordResetMailer(db_admin, token,False, request).send()
-        return db_admin
+        trigger_password_reset_email(db_admin, "admin", False)
+
+    return db_admin
 
 def delete(db:Session, id: int, current_admin: Admin):
     db_admin = get_admins(db, current_admin).filter(Admin.id == id).first()

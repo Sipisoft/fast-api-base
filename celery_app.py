@@ -10,6 +10,9 @@ celery_app = Celery(
     include=["src.workers.tasks"],
 )
 
+
+celery_app.autodiscover_tasks("src.workers")
+
 celery_app.conf.update(
     task_serializer='json',
     accept_content=['json'],
