@@ -1,5 +1,6 @@
 from typing import Optional, TypeVar, Generic
-from fastapi import Query
+from fastapi.params import Query
+from pydantic import Field, ConfigDict
 from pydantic.generics import GenericModel
 from datetime import date
 
@@ -22,14 +23,14 @@ class Pagination:
         end_date: Optional[str] = Query(None, description="End date for filtering (YYYY-MM-DD)"),
         query: Optional[str] = Query(None, description="Query string to search for")
     ):
-        self.page = page
-        self.size = size
-        self.skip = (page - 1) * size
-        self.limit = size
-        self.all = all
-        self.start_date = start_date or str(date.today())
-        self.end_date = end_date or str(date.today())
-        self.query = query
+        self.page = page if not isinstance(page, Query) else 1
+        self.size = size if not isinstance(size, Query) else 20
+        self.skip = (self.page - 1) * self.size
+        self.limit = self.size
+        self.all = all if not isinstance(all, Query) else False
+        self.start_date = start_date if not isinstance(start_date, Query) else str(date.today())
+        self.end_date = end_date if not isinstance(end_date, Query) else str(date.today())
+        self.query = query if not isinstance(query, Query) else None
 
 class PaginatedResponse(GenericModel, Generic[T]):
     page: int
